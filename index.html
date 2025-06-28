@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e0e6ed;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .editor-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: rgba(15, 15, 35, 0.9);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            color: #64ffda;
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .node-palette {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .palette-node {
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            cursor: grab;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .palette-node:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+            border-color: rgba(59, 130, 246, 0.6);
+        }
+
+        .palette-node:active {
+            cursor: grabbing;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .canvas {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background-image: 
+                radial-gradient(circle at 25px 25px, rgba(255, 255, 255, 0.05) 2px, transparent 0),
+                radial-gradient(circle at 75px 75px, rgba(255, 255, 255, 0.05) 2px, transparent 0);
+            background-size: 50px 50px;
+            cursor: grab;
+        }
+
+        .canvas:active {
+            cursor: grabbing;
+        }
+
+        .node {
+            position: absolute;
+            min-width: 180px;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.95) 100%);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: move;
+            user-select: none;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .node:hover {
+            border-color: rgba(148, 163, 184, 0.4);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .node.selected {
+            border-color: #64ffda;
+            box-shadow: 0 0 0 2px rgba(100, 255, 218, 0.3);
+        }
+
+        .node-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .node-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #e2e8f0;
+        }
+
+        .node-delete {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+
+        .node-delete:hover {
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+
+        .node-content {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 12px;
+        }
+
+        .node-ports {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .input-ports, .output-ports {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .port {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #64ffda;
+            background: rgba(15, 15, 35, 0.9);
+            cursor: crosshair;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .port:hover {
+            background: #64ffda;
+            box-shadow: 0 0 10px rgba(100, 255, 218, 0.5);
+            transform: scale(1.2);
+        }
+
+        .port.input {
+            margin-left: -6px;
+        }
+
+        .port.output {
+            margin-right: -6px;
+        }
+
+        .connection-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .connection-path {
+            fill: none;
+            stroke: #64ffda;
+            stroke-width: 2;
+            opacity: 0.8;
+        }
+
+        .connection-path:hover {
+            stroke-width: 3;
+            opacity: 1;
+        }
+
+        .temp-connection {
+            stroke: #fbbf24;
+            stroke-dasharray: 5,5;
+            animation: dash 1s linear infinite;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -10;
+            }
+        }
+
+        .context-menu {
+            position: absolute;
+            background: rgba(15, 15, 35, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 150px;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s ease;
+        }
+
+        .context-menu-item:hover {
+            background-color: rgba(59, 130, 246, 0.2);
+        }
+
+        .toolbar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .toolbar-btn {
+            padding: 10px 16px;
+            background: rgba(15, 15, 35, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #e2e8f0;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .toolbar-btn:hover {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 5px;
+            z-index: 100;
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(15, 15, 35, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #e2e8f0;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .zoom-btn:hover {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 200px;
+            }
+            
+            .node {
+                min-width: 150px;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <div class="sidebar">
+            <h2>Node Palette</h2>
+            <div class="node-palette">
+                <div class="palette-node" data-type="input">Input Node</div>
+                <div class="palette-node" data-type="process">Process Node</div>
+                <div class="palette-node" data-type="output">Output Node</div>
+                <div class="palette-node" data-type="math">Math Node</div>
+                <div class="palette-node" data-type="logic">Logic Node</div>
+                <div class="palette-node" data-type="filter">Filter Node</div>
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <div class="toolbar">
+                <button class="toolbar-btn" onclick="clearCanvas()">Clear All</button>
+                <button class="toolbar-btn" onclick="exportData()">Export</button>
+                <button class="toolbar-btn" onclick="importData()">Import</button>
+            </div>
+            
+            <div class="canvas" id="canvas">
+                <svg class="connection-svg" id="connectionSvg"></svg>
+            </div>
+            
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="zoomIn()">+</button>
+                <button class="zoom-btn" onclick="zoomOut()">−</button>
+                <button class="zoom-btn" onclick="resetZoom()">⌂</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class NodeEditor {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.connectionSvg = document.getElementById('connectionSvg');
+                this.nodes = new Map();
+                this.connections = [];
+                this.nodeCounter = 0;
+                this.selectedNode = null;
+                this.isDragging = false;
+                this.isConnecting = false;
+                this.connectionStart = null;
+                this.tempConnection = null;
+                this.canvasOffset = { x: 0, y: 0 };
+                this.zoom = 1;
+                this.isPanning = false;
+                this.lastPanPoint = { x: 0, y: 0 };
+                
+                this.init();
+            }
+            
+            init() {
+                this.setupEventListeners();
+                this.updateConnectionSvg();
+            }
+            
+            setupEventListeners() {
+                // Palette drag and drop
+                document.querySelectorAll('.palette-node').forEach(node => {
+                    node.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', node.dataset.type);
+                    });
+                    node.draggable = true;
+                });
+                
+                // Canvas drop
+                this.canvas.addEventListener('dragover', (e) => e.preventDefault());
+                this.canvas.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const nodeType = e.dataTransfer.getData('text/plain');
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = (e.clientX - rect.left - this.canvasOffset.x) / this.zoom;
+                    const y = (e.clientY - rect.top - this.canvasOffset.y) / this.zoom;
+                    this.createNode(nodeType, x, y);
+                });
+                
+                // Canvas panning
+                this.canvas.addEventListener('mousedown', (e) => {
+                    if (e.target === this.canvas) {
+                        this.isPanning = true;
+                        this.lastPanPoint = { x: e.clientX, y: e.clientY };
+                        this.canvas.style.cursor = 'grabbing';
+                    }
+                });
+                
+                document.addEventListener('mousemove', (e) => {
+                    if (this.isPanning) {
+                        const deltaX = e.clientX - this.lastPanPoint.x;
+                        const deltaY = e.clientY - this.lastPanPoint.y;
+                        this.canvasOffset.x += deltaX;
+                        this.canvasOffset.y += deltaY;
+                        this.updateCanvasTransform();
+                        this.lastPanPoint = { x: e.clientX, y: e.clientY };
+                    }
+                    
+                    if (this.isConnecting && this.tempConnection) {
+                        this.updateTempConnection(e);
+                    }
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    this.isPanning = false;
+                    this.canvas.style.cursor = 'grab';
+                    
+                    if (this.isConnecting) {
+                        this.cancelConnection();
+                    }
+                });
+                
+                // Context menu
+                this.canvas.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    if (e.target === this.canvas) {
+                        this.showContextMenu(e.clientX, e.clientY);
+                    }
+                });
+                
+                // Click to hide context menu
+                document.addEventListener('click', () => {
+                    this.hideContextMenu();
+                });
+                
+                // Keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Delete' && this.selectedNode) {
+                        this.deleteNode(this.selectedNode);
+                    }
+                    if (e.key === 'Escape') {
+                        this.deselectAll();
+                    }
+                });
+            }
+            
+            createNode(type, x, y) {
+                const nodeId = `node_${this.nodeCounter++}`;
+                const nodeElement = document.createElement('div');
+                nodeElement.className = 'node';
+                nodeElement.dataset.nodeId = nodeId;
+                nodeElement.style.left = `${x}px`;
+                nodeElement.style.top = `${y}px`;
+                
+                const nodeConfig = this.getNodeConfig(type);
+                nodeElement.innerHTML = `
+                    <div class="node-header">
+                        <div class="node-title">${nodeConfig.title}</div>
+                        <button class="node-delete" onclick="nodeEditor.deleteNode('${nodeId}')">&times;</button>
+                    </div>
+                    <div class="node-content">${nodeConfig.description}</div>
+                    <div class="node-ports">
+                        <div class="input-ports">
+                            ${nodeConfig.inputs.map((input, i) => 
+                                `<div class="port input" data-port="input_${i}" title="${input}"></div>`
+                            ).join('')}
+                        </div>
+                        <div class="output-ports">
+                            ${nodeConfig.outputs.map((output, i) => 
+                                `<div class="port output" data-port="output_${i}" title="${output}"></div>`
+                            ).join('')}
+                        </div>
+                    </div>
+                `;
+                
+                this.canvas.appendChild(nodeElement);
+                this.nodes.set(nodeId, {
+                    element: nodeElement,
+                    type: type,
+                    position: { x, y },
+                    inputs: nodeConfig.inputs,
+                    outputs: nodeConfig.outputs
+                });
+                
+                this.setupNodeEvents(nodeElement, nodeId);
+                this.updateConnectionSvg();
+            }
+            
+            getNodeConfig(type) {
+                const configs = {
+                    input: {
+                        title: 'Input',
+                        description: 'Data input source',
+                        inputs: [],
+                        outputs: ['Data']
+                    },
+                    process: {
+                        title: 'Process',
+                        description: 'Data processing unit',
+                        inputs: ['Input'],
+                        outputs: ['Output']
+                    },
+                    output: {
+                        title: 'Output',
+                        description: 'Data output destination',
+                        inputs: ['Input'],
+                        outputs: []
+                    },
+                    math: {
+                        title: 'Math',
+                        description: 'Mathematical operations',
+                        inputs: ['A', 'B'],
+                        outputs: ['Result']
+                    },
+                    logic: {
+                        title: 'Logic',
+                        description: 'Boolean logic operations',
+                        inputs: ['A', 'B'],
+                        outputs: ['Result']
+                    },
+                    filter: {
+                        title: 'Filter',
+                        description: 'Data filtering and validation',
+                        inputs: ['Data', 'Criteria'],
+                        outputs: ['Filtered']
+                    }
+                };
+                
+                return configs[type] || configs.process;
+            }
+            
+            setupNodeEvents(nodeElement, nodeId) {
+                let isDragging = false;
+                let dragOffset = { x: 0, y: 0 };
+                
+                // Node selection
+                nodeElement.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.selectNode(nodeId);
+                });
+                
+                // Node dragging
+                nodeElement.addEventListener('mousedown', (e) => {
+                    if (e.target.classList.contains('port')) return;
+                    if (e.target.classList.contains('node-delete')) return;
+                    
+                    isDragging = true;
+                    const rect = nodeElement.getBoundingClientRect();
+                    const canvasRect = this.canvas.getBoundingClientRect();
+                    dragOffset.x = e.clientX - rect.left;
+                    dragOffset.y = e.clientY - rect.top;
+                    
+                    this.selectNode(nodeId);
+                    e.preventDefault();
+                });
+                
+                document.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const canvasRect = this.canvas.getBoundingClientRect();
+                        const x = (e.clientX - canvasRect.left - dragOffset.x - this.canvasOffset.x) / this.zoom;
+                        const y = (e.clientY - canvasRect.top - dragOffset.y - this.canvasOffset.y) / this.zoom;
+                        
+                        nodeElement.style.left = `${x}px`;
+                        nodeElement.style.top = `${y}px`;
+                        
+                        this.nodes.get(nodeId).position = { x, y };
+                        this.updateConnections();
+                    }
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+                
+                // Port connections
+                nodeElement.querySelectorAll('.port').forEach(port => {
+                    port.addEventListener('mousedown', (e) => {
+                        e.stopPropagation();
+                        this.startConnection(nodeId, port.dataset.port, port.classList.contains('output'));
+                    });
+                    
+                    port.addEventListener('mouseup', (e) => {
+                        e.stopPropagation();
+                        if (this.isConnecting) {
+                            this.endConnection(nodeId, port.dataset.port, port.classList.contains('input'));
+                        }
+                    });
+                });
+            }
+            
+            selectNode(nodeId) {
+                this.deselectAll();
+                this.selectedNode = nodeId;
+                this.nodes.get(nodeId).element.classList.add('selected');
+            }
+            
+            deselectAll() {
+                if (this.selectedNode) {
+                    this.nodes.get(this.selectedNode).element.classList.remove('selected');
+                    this.selectedNode = null;
+                }
+            }
+            
+            deleteNode(nodeId) {
+                const node = this.nodes.get(nodeId);
+                if (node) {
+                    // Remove connections
+                    this.connections = this.connections.filter(conn => 
+                        conn.from.nodeId !== nodeId && conn.to.nodeId !== nodeId
+                    );
+                    
+                    // Remove node element
+                    node.element.remove();
+                    this.nodes.delete(nodeId);
+                    
+                    if (this.selectedNode === nodeId) {
+                        this.selectedNode = null;
+                    }
+                    
+                    this.updateConnections();
+                }
+            }
+            
+            startConnection(nodeId, portId, isOutput) {
+                if (!isOutput) return; // Only start from output ports
+                
+                this.isConnecting = true;
+                this.connectionStart = { nodeId, portId };
+                
+                // Create temporary connection line
+                this.tempConnection = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                this.tempConnection.classList.add('connection-path', 'temp-connection');
+                this.connectionSvg.appendChild(this.tempConnection);
+            }
+            
+            updateTempConnection(e) {
+                if (!this.tempConnection || !this.connectionStart) return;
+                
+                const startPort = this.getPortPosition(this.connectionStart.nodeId, this.connectionStart.portId);
+                const canvasRect = this.canvas.getBoundingClientRect();
+                const endX = (e.clientX - canvasRect.left - this.canvasOffset.x) / this.zoom;
+                const endY = (e.clientY - canvasRect.top - this.canvasOffset.y) / this.zoom;
+                
+                const path = this.createConnectionPath(startPort.x, startPort.y, endX, endY);
+                this.tempConnection.setAttribute('d', path);
+            }
+            
+            endConnection(nodeId, portId, isInput) {
+                if (!this.isConnecting || !this.connectionStart || !isInput) {
+                    this.cancelConnection();
+                    return;
+                }
+                
+                // Check if connection is valid (not connecting to same node)
+                if (this.connectionStart.nodeId === nodeId) {
+                    this.cancelConnection();
+                    return;
+                }
+                
+                // Create connection
+                const connection = {
+                    from: this.connectionStart,
+                    to: { nodeId, portId }
+                };
+                
+                this.connections.push(connection);
+                this.cancelConnection();
+                this.updateConnections();
+            }
+            
+            cancelConnection() {
+                this.isConnecting = false;
+                this.connectionStart = null;
+                
+                if (this.tempConnection) {
+                    this.tempConnection.remove();
+                    this.tempConnection = null;
+                }
+            }
+            
+            getPortPosition(nodeId, portId) {
+                const node = this.nodes.get(nodeId);
+                if (!node) return { x: 0, y: 0 };
+                
+                const nodeRect = node.element.getBoundingClientRect();
+                const canvasRect = this.canvas.getBoundingClientRect();
+                const port = node.element.querySelector(`[data-port="${portId}"]`);
+                
+                if (!port) return { x: 0, y: 0 };
+                
+                const portRect = port.getBoundingClientRect();
+                
+                return {
+                    x: (portRect.left + portRect.width / 2 - canvasRect.left - this.canvasOffset.x) / this.zoom,
+                    y: (portRect.top + portRect.height / 2 - canvasRect.top - this.canvasOffset.y) / this.zoom
+                };
+            }
+            
+            createConnectionPath(x1, y1, x2, y2) {
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const controlOffset = Math.abs(dx) * 0.5;
+                
+                return `M ${x1} ${y1} C ${x1 + controlOffset} ${y1}, ${x2 - controlOffset} ${y2}, ${x2} ${y2}`;
+            }
+            
+            updateConnections() {
+                // Clear existing connections
+                this.connectionSvg.querySelectorAll('.connection-path:not(.temp-connection)').forEach(path => {
+                    path.remove();
+                });
+                
+                // Draw all connections
+                this.connections.forEach(connection => {
+                    const startPos = this.getPortPosition(connection.from.nodeId, connection.from.portId);
+                    const endPos = this.getPortPosition(connection.to.nodeId, connection.to.portId);
+                    
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.classList.add('connection-path');
+                    path.setAttribute('d', this.createConnectionPath(startPos.x, startPos.y, endPos.x, endPos.y));
+                    
+                    // Add click handler for connection deletion
+                    path.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.deleteConnection(connection);
+                    });
+                    
+                    this.connectionSvg.appendChild(path);
+                });
+            }
+            
+            deleteConnection(connectionToDelete) {
+                this.connections = this.connections.filter(conn => conn !== connectionToDelete);
+                this.updateConnections();
+            }
+            
+            updateConnectionSvg() {
+                const rect = this.canvas.getBoundingClientRect();
+                this.connectionSvg.setAttribute('width', rect.width);
+                this.connectionSvg.setAttribute('height', rect.height);
+            }
+            
+            updateCanvasTransform() {
+                this.canvas.style.transform = `translate(${this.canvasOffset.x}px, ${this.canvasOffset.y}px) scale(${this.zoom})`;
+                this.updateConnections();
+            }
+            
+            showContextMenu(x, y) {
+                this.hideContextMenu();
+                
+                const contextMenu = document.createElement('div');
+                contextMenu.className = 'context-menu';
+                contextMenu.style.left = `${x}px`;
+                contextMenu.style.top = `${y}px`;
+                
+                const menuItems = [
+                    { label: 'Add Input Node', action: () => this.addNodeAtPosition('input', x, y) },
+                    { label: 'Add Process Node', action: () => this.addNodeAtPosition('process', x, y) },
+                    { label: 'Add Output Node', action: () => this.addNodeAtPosition('output', x, y) },
+                    { label: 'Add Math Node', action: () => this.addNodeAtPosition('math', x, y) }
+                ];
+                
+                menuItems.forEach(item => {
+                    const menuItem = document.createElement('div');
+                    menuItem.className = 'context-menu-item';
+                    menuItem.textContent = item.label;
+                    menuItem.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        item.action();
+                        this.hideContextMenu();
+                    });
+                    contextMenu.appendChild(menuItem);
+                });
+                
+                document.body.appendChild(contextMenu);
+                this.currentContextMenu = contextMenu;
+            }
+            
+            hideContextMenu() {
+                if (this.currentContextMenu) {
+                    this.currentContextMenu.remove();
+                    this.currentContextMenu = null;
+                }
+            }
+            
+            addNodeAtPosition(type, screenX, screenY) {
+                const canvasRect = this.canvas.getBoundingClientRect();
+                const x = (screenX - canvasRect.left - this.canvasOffset.x) / this.zoom;
+                const y = (screenY - canvasRect.top - this.canvasOffset.y) / this.zoom;
+                this.createNode(type, x, y);
+            }
+        }
+        
+        // Global functions for toolbar
+        let nodeEditor;
+        
+        function clearCanvas() {
+            if (confirm('Are you sure you want to clear all nodes?')) {
+                nodeEditor.nodes.forEach((node, nodeId) => {
+                    nodeEditor.deleteNode(nodeId);
+                });
+            }
+        }
+        
+        function exportData() {
+            const data = {
+                nodes: Array.from(nodeEditor.nodes.entries()).map(([id, node]) => ({
+                    id,
+                    type: node.type,
+                    position: node.position
+                })),
+                connections: nodeEditor.connections
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'node-editor-data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = JSON.parse(e.target.result);
+                            clearCanvas();
+                            
+                            // Import nodes
+                            data.nodes.forEach(nodeData => {
+                                nodeEditor.createNode(nodeData.type, nodeData.position.x, nodeData.position.y);
+                            });
+                            
+                            // Import connections (simplified for demo)
+                            nodeEditor.connections = data.connections || [];
+                            nodeEditor.updateConnections();
+                        } catch (error) {
+                            alert('Error importing file: ' + error.message);
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+        
+        function zoomIn() {
+            nodeEditor.zoom = Math.min(nodeEditor.zoom * 1.2, 3);
+            nodeEditor.updateCanvasTransform();
+        }
+        
+        function zoomOut() {
+            nodeEditor.zoom = Math.max(nodeEditor.zoom / 1.2, 0.3);
+            nodeEditor.updateCanvasTransform();
+        }
+        
+        function resetZoom() {
+            nodeEditor.zoom = 1;
+            nodeEditor.canvasOffset = { x: 0, y: 0 };
+            nodeEditor.updateCanvasTransform();
+        }
+        
+        // Initialize the editor
+        document.addEventListener('DOMContentLoaded', () => {
+            nodeEditor = new NodeEditor();
+            
+            // Add some sample nodes
+            nodeEditor.createNode('input', 100, 100);
+            nodeEditor.createNode('process', 350, 150);
+            nodeEditor.createNode('output', 600, 100);
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            nodeEditor.updateConnectionSvg();
+            nodeEditor.updateConnections();
+        });
+    </script>
+</body>
+</html>

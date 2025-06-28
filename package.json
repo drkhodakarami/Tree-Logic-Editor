@@ -1,0 +1,76 @@
+{
+  "name": "tick-tree-editor",
+  "version": "0.1.0",
+  "description": "Logic Tree Editor Application",
+  "author": {
+    "name": "Jiraiyah",
+    "email": ""
+  },
+  "private": true,
+  "main": "main.js",
+  "build": {
+    "appId": "dev.jiraiyah",
+    "productName": "Logic Tree Editor",
+    "icon": "assets/icon.ico",
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      ".next/**/*",
+      "node_modules/**/*",
+      "package.json",
+      "next.config.js",
+      "public/**/*",
+      "assets/**/*",
+      "!node_modules/.bin"
+    ]
+  },
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "lint": "next lint",
+    "start": "next start",
+    "electron": "electron .",
+    "build:electron": "npm run compile:main && next build && next export && electron-builder",
+    "build:win": "npm run next build && next export && electron-builder --win",
+    "build:mac": "npm run next build && next export && electron-builder --mac",
+    "build:lin": "npm run next build && next export && electron-builder --linux"
+  },
+  "dependencies": {
+    "@xyflow/react": "latest",
+    "react": "^19.1.0",
+    "react-icons": "latest",
+    "react-dom": "^19.1.0",
+    "next": "^15.2.4",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss-animate": "^1.0.7",
+    "html-to-image": "^1.11.13",
+    "wait-port": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "electron": "^37.1.0",
+    "electron-builder": "^26.0.12",
+    "postcss": "^8.5",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5"
+    }
+}
