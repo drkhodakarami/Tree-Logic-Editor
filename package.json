@@ -1,6 +1,6 @@
 {
   "name": "tick-tree-editor",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "description": "Logic Tree Editor Application",
   "author": {
     "name": "Jiraiyah",
@@ -42,25 +42,25 @@
     ]
   },
   "scripts": {
-    "build": "next build",
+    "build": "npm run build",
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
     "electron": "electron .",
-    "build:electron": "npm run compile:main && next build && next export && electron-builder",
-    "build:win": "npm run next build && next export && electron-builder --win",
-    "build:mac": "npm run next build && next export && electron-builder --mac",
-    "build:lin": "npm run next build && next export && electron-builder --linux"
+    "build:win": "npx electron-builder --win",
+    "build:mac": "npx electron-builder --mac",
+    "build:lin": "npx electron-builder --linux"
   },
   "dependencies": {
     "@xyflow/react": "latest",
-    "react": "^19.1.0",
-    "react-icons": "latest",
-    "react-dom": "^19.1.0",
+    "html-to-image": "^1.11.13",
     "next": "^15.2.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-icons": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
-    "html-to-image": "^1.11.13",
+    "tree-kill": "^1.2.2",
     "wait-port": "^1.1.0"
   },
   "devDependencies": {
@@ -72,5 +72,5 @@
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"
-    }
+  }
 }

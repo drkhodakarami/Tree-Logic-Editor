@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useState, useEffect, useRef } from "react";
+import React, { useCallback, useState, useEffect, useRef, useLayoutEffect } from "react";
 import {
   useReactFlow,
   ReactFlow,
@@ -36,8 +36,14 @@ import {
   FaCamera,
   FaSync,
   FaCheckCircle,
+  FaFire,
+  FaKey,
+  FaBullhorn,
+  FaBinoculars,
+  FaLock,
 } from "react-icons/fa";
 import { toPng } from "html-to-image";
+import { FaWandMagicSparkles } from "react-icons/fa6";
 
 // ------ Global Constants: icons, BTType, meta, nodeTypes ------
 const icons = {
@@ -45,8 +51,18 @@ const icons = {
   selector: FaQuestion,
   sequence: FaListUl,
   condition: FaQuestionCircle,
+  hasRecipe: FaQuestionCircle,
+  hasBBValue: FaBinoculars,
   subtree: FaSitemap,
+  hasResource: FaSitemap,
+  handleResource: FaSitemap,
+  handleCraft: FaSitemap,
   action: FaCogs,
+  getRecipe: FaKey,
+  setRecipe: FaLock,
+  logOut: FaBullhorn,
+  getBBValue: FaBinoculars,
+  random: FaFire,
   randomSelector: FaRandom,
   randomSequence: FaDiceFive,
   not: FaTimes,
@@ -62,8 +78,18 @@ const meta: Record<BTType, { label: string; color: string }> = {
   selector: { label: "Selector", color: "#ef4444" },
   sequence: { label: "Sequence", color: "#3b82f6" },
   condition: { label: "Condition", color: "#8b5cf6" },
-  subtree: { label: "SubTree", color: "#14b8a6" },
+  hasRecipe: { label: "Has Recipe", color: "#f97316" },
+  hasBBValue: { label: "Has B.B. Value", color: "#8b5cf6" },
+  subtree: { label: "SubTree Node", color: "#14b8a6" },
+  hasResource: { label: "Has Resource Tree", color: "#ec4899" },
+  handleResource: { label: "Handle Resource Tree", color: "#84cc16" },
+  handleCraft: { label: "Handle Craft Tree", color: "#f59e0b" },
   action: { label: "Action", color: "#f97316" },
+  getRecipe: { label: "Get Recipe", color: "#f97316" },
+  setRecipe: { label: "Set Recipe", color: "#f97316" },
+  logOut: { label: "Log", color: "#eab308" },
+  getBBValue: { label: "Get B.B. Value", color: "#eab308" },
+  random: { label: "Random", color: "#dc2626" },
   randomSelector: { label: "Random Selector", color: "#dc2626" },
   randomSequence: { label: "Random Sequence", color: "#2563eb" },
   not: { label: "Not", color: "#f59e0b" },
@@ -86,12 +112,42 @@ function BTNode({
   const hasOutputs = !(
     data.type === "action" ||
     data.type === "subtree" ||
-    data.type === "untilSuccess" ||
-    data.type === "untilFailure" ||
-    data.type === "repeat"
+    data.type === "condition" ||
+    data.type === "hasResource" ||
+    data.type === "handleResource" ||
+    data.type === "handleCraft" ||
+    data.type === "getResource" ||
+    data.type === "logOut" ||
+    data.type === "hasRecipe" ||
+    data.type === "hasBBValue" ||
+    data.type === "getRecipe" ||
+    data.type === "setRecipe" ||
+    data.type === "getBBValue"
   );
   const [description, setDescription] = useState(data.description || "");
   const [showDesc, setShowDesc] = useState(false);
+
+  // Dynamic font size for label auto-fit
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [fontSize, setFontSize] = useState(12);
+  const maxFontSize = 12;
+  const minFontSize = 7;
+  const nodeLabelWidth = 80; // px, adjust as needed for your layout
+
+  useLayoutEffect(() => {
+    if (!labelRef.current) return;
+    let size = maxFontSize;
+    labelRef.current.style.fontSize = `${size}px`;
+    labelRef.current.style.whiteSpace = "nowrap";
+    while (
+      labelRef.current.scrollWidth > nodeLabelWidth &&
+      size > minFontSize
+    ) {
+      size -= 1;
+      labelRef.current.style.fontSize = `${size}px`;
+    }
+    setFontSize(size);
+  }, [data.label]);
 
   useEffect(() => {
     data.description = description;
@@ -127,7 +183,22 @@ function BTNode({
       <div className="p-1">
         <div className="flex items-center gap-2">
           <Icon className="text-base flex-shrink-0" style={{ color: meta[data.type as BTType].color }} />
-          <span className="font-bold text-xs leading-tight truncate">{data.label}</span>
+          <span
+            ref={labelRef}
+            style={{
+              fontWeight: "bold",
+              fontSize,
+              lineHeight: "1.1",
+              maxWidth: nodeLabelWidth,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis"
+            }}
+            className="leading-tight"
+            title={data.label}
+          >
+            {data.label}
+          </span>
         </div>
         <button
           onClick={() => setShowDesc(!showDesc)}
@@ -170,6 +241,7 @@ function BTNode({
     </div>
   );
 }
+
 const nodeTypes = { bt: BTNode };
 
 const edgeTypes: EdgeTypes = {
@@ -323,9 +395,12 @@ function CustomMiniMap({ nodes, edges, isVisible }: CustomMiniMapProps) {
         const sourceY = (sourceNode.position.y - bounds.minY) * scale + offsetY + 20 * scale;
         const targetX = (targetNode.position.x - bounds.minX) * scale + offsetX + 24 * scale;
         const targetY = (targetNode.position.y - bounds.minY) * scale + offsetY + 20 * scale;
+        const midY = sourceY + Math.abs(targetY - sourceY) * 0.3;
 
         ctx.beginPath();
         ctx.moveTo(sourceX, sourceY);
+        ctx.lineTo(sourceX, midY);
+        ctx.lineTo(targetX, midY);
         ctx.lineTo(targetX, targetY);
         ctx.stroke();
       }
@@ -646,6 +721,8 @@ interface CanvasProps {
   addNode: (t: BTType, p: { x: number; y: number }) => void;
   selectedNodes: string[];
   deleteSelectedNodes: () => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 function FlowCanvas({
@@ -657,6 +734,8 @@ function FlowCanvas({
   addNode,
   selectedNodes,
   deleteSelectedNodes,
+  undo,
+  redo
 }: CanvasProps) {
   const {
     zoomIn,
@@ -745,13 +824,25 @@ function FlowCanvas({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.shiftKey && e.key === "z"))) {
+        e.preventDefault();
+        redo();
+      }
+      // If an input or textarea is focused, do not delete nodes
+      const tag = (document.activeElement && document.activeElement.tagName) || "";
+      if ((tag === "INPUT" || tag === "TEXTAREA")) return;
+
       if (e.key === "Delete" && selectedNodes.length > 0)
         deleteSelectedNodes();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () =>
       document.removeEventListener("keydown", handleKeyDown);
-  }, [selectedNodes, deleteSelectedNodes]);
+  }, [undo, redo, selectedNodes, deleteSelectedNodes]);
 
   const openMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -957,6 +1048,9 @@ export default function BehaviorTreeEditor() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [id, setId] = useState(1);
 
+  const [history, setHistory] = useState([]);
+  const [future, setFuture] = useState([]);
+
   const selectedNodes = nodes
     .filter((node) => node.selected)
     .map((node) => node.id);
@@ -977,7 +1071,37 @@ export default function BehaviorTreeEditor() {
     setId((n) => n + 1);
   };
 
+  const pushToHistory = useCallback(() => {
+    setHistory((h) => [...h, {nodes, edges}]);
+    setFuture([]); // clear future on new action
+  }, [nodes, edges]);
+
+  // Undo handler
+  const undo = useCallback(() => {
+    setHistory((h) => {
+      if (h.length === 0) return h;
+      const prev = h[h.length - 1];
+      setFuture((f) => [{ nodes, edges }, ...f]);
+      setNodes(prev.nodes);
+      setEdges(prev.edges);
+      return h.slice(0, -1);
+    });
+  }, [nodes, edges, setNodes, setEdges]);
+
+  // Redo handler
+  const redo = useCallback(() => {
+    setFuture((f) => {
+      if (f.length === 0) return f;
+      const next = f[0];
+      setHistory((h) => [...h, { nodes, edges }]);
+      setNodes(next.nodes);
+      setEdges(next.edges);
+      return f.slice(1);
+    });
+  }, [nodes, edges, setNodes, setEdges]);
+
   const deleteSelectedNodes = useCallback(() => {
+    pushToHistory();
     const selectedNodeIds = new Set(selectedNodes);
 
     setNodes((nds) =>
@@ -990,7 +1114,15 @@ export default function BehaviorTreeEditor() {
           !selectedNodeIds.has(edge.target)
       )
     );
-  }, [selectedNodes, setNodes, setEdges]);
+  }, [pushToHistory, selectedNodes, setNodes, setEdges]);
+
+  const clearAll = useCallback(() => {
+    setHistory((h) => [...h, { nodes, edges }]);
+    setFuture([]);
+    setNodes([]);
+    setEdges([]);
+    setId(1);
+  }, [nodes, edges, setNodes, setEdges, setId]);
 
   const onConnect = useCallback(
     (c: Connection) =>
@@ -1058,10 +1190,7 @@ export default function BehaviorTreeEditor() {
 
   return (
     <div className="h-screen flex bg-[#161616] text-neutral-200">
-      <aside className={SIDEBAR}>
-        <h2 className="font-semibold mb-3 text-neutral-100 text-sm">
-          Behavior Tree
-        </h2>
+      <aside className={`${SIDEBAR} h-screen overflow-y-auto`}>
         <div className="space-y-1.5">
           {(Object.keys(icons) as BTType[]).map((t) => {
             const Icon = icons[t];
@@ -1099,6 +1228,12 @@ export default function BehaviorTreeEditor() {
             className="hidden"
             onChange={importJSON}
           />
+          <button
+            onClick={clearAll}
+            className={BTN}
+          >
+            <span className="text-xs">Clear All</span>
+          </button>
         </div>
       </aside>
 
@@ -1112,6 +1247,8 @@ export default function BehaviorTreeEditor() {
           addNode={addNode}
           selectedNodes={selectedNodes}
           deleteSelectedNodes={deleteSelectedNodes}
+          undo={undo}
+          redo={redo}
         />
       </ReactFlowProvider>
     </div>
