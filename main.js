@@ -1,5 +1,5 @@
 const { app, BrowserWindow } = require('electron');
-const { exec } = require('child_process');
+const { spawn } = require("child_process");
 const waitPort = require('wait-port');
 
 function createWindow() {
@@ -19,7 +19,10 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   // running Next.js server
-  const nextServer = exec('npm run start');
+  const nextServer = spawn("npm", ["run", "start"], {
+    stdio: "inherit",
+    shell: true,
+  });
 
   //Wait until 3000 port opens
   await waitPort({ host: 'localhost', port: 3000 });
@@ -27,7 +30,9 @@ app.whenReady().then(async () => {
   createWindow();
 
   app.on('window-all-closed', () => {
-    nextServer.kill();
+    if (nextServer.pid) {
+      nextServer.kill("SIGTERM");
+    }
     if (process.platform !== 'darwin') {
       app.quit();
     }

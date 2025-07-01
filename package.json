@@ -42,7 +42,7 @@
     ]
   },
   "scripts": {
-    "build": "npm run build",
+    "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
@@ -60,7 +60,6 @@
     "react-icons": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
-    "tree-kill": "^1.2.2",
     "wait-port": "^1.1.0"
   },
   "devDependencies": {
